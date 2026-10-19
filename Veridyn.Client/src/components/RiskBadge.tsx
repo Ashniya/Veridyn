@@ -2,14 +2,16 @@ import React from 'react';
 import { AlertCircle, AlertTriangle, CheckCircle2, Flame } from 'lucide-react';
 
 interface Props {
-  riskLevel: number | string; // 1: Low, 2: Med, 3: High, 4: Critical
+  riskLevel?: number | string; // 1: Low, 2: Med, 3: High, 4: Critical
+  level?: number | string;
   delayProbability?: number;
 }
 
-export const RiskBadge: React.FC<Props> = ({ riskLevel, delayProbability }) => {
-  const levelStr = typeof riskLevel === 'number' 
-    ? (riskLevel === 4 ? 'Critical' : riskLevel === 3 ? 'High' : riskLevel === 2 ? 'Medium' : 'Low')
-    : riskLevel;
+export const RiskBadge: React.FC<Props> = ({ riskLevel, level, delayProbability }) => {
+  const effectiveLevel = riskLevel ?? level ?? 1;
+  const levelStr = typeof effectiveLevel === 'number' 
+    ? (effectiveLevel === 4 ? 'Critical' : effectiveLevel === 3 ? 'High' : effectiveLevel === 2 ? 'Medium' : 'Low')
+    : effectiveLevel;
 
   const styles = {
     Critical: 'bg-rose-950/60 border-rose-700/80 text-rose-300',

@@ -8,15 +8,16 @@ export const Sidebar: React.FC = () => {
   const role = user?.role; // 1 = Admin, 2 = PM, 3 = Dev
 
   const navItems = [
-    { label: 'Executive Dashboard', path: '/', icon: LayoutDashboard },
+    { label: 'Executive Dashboard', path: '/dashboard', icon: LayoutDashboard },
     { label: 'Projects Health', path: '/projects', icon: FolderGit2 },
-    { label: 'Tasks & Evidence Matrix', path: '/tasks', icon: CheckSquare },
-    { label: 'GitHub Evidence Stream', path: '/github', icon: GitPullRequest },
-    { label: 'Worklogs & Daily Updates', path: '/worklogs', icon: Clock },
   ];
 
-  if (role === 1 || role === 2) {
-    navItems.push({ label: 'Admin & Team Governance', path: '/admin', icon: ShieldCheck });
+  if (role === 1 || user?.roleName === 'Admin') {
+    navItems.push({ label: 'Admin Governance', path: '/admin', icon: ShieldCheck });
+  } else if (role === 2 || user?.roleName === 'ProjectManager') {
+    navItems.push({ label: 'Manager Workbench', path: '/manager', icon: ShieldCheck });
+  } else if (role === 3 || user?.roleName === 'Developer') {
+    navItems.push({ label: 'Dev Workbench', path: '/dev', icon: CheckSquare });
   }
 
   return (

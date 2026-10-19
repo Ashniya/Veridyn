@@ -99,10 +99,17 @@ public class AuthController : ControllerBase
         });
     }
 
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,ProjectManager")]
     [HttpPost("register")]
     public async Task<ActionResult<AuthResponse>> Register([FromBody] RegisterRequest request)
     {
+        // Enforce role hierarchy: Project Managers can only create Developers
+        var isManager = User.IsInRole("ProjectManager");
+        if (isManager && request.Role != UserRoleType.Developer)
+        {
+            return StatusCode(403, new { message = "Project Managers are only authorized to create Developer accounts." });
+        }
+
         var existing = await _userManager.FindByEmailAsync(request.Email);
         if (existing != null)
         {
@@ -134,7 +141,31 @@ public class AuthController : ControllerBase
         }
         await _userManager.AddToRoleAsync(user, roleName);
 
-        return await Login(new LoginRequest { Email = request.Email, Password = request.Password });
+        await _auditService.LogAsync(
+            User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "System",
+            User.FindFirstValue(ClaimTypes.Email) ?? "System",
+            "UserCreated",
+            "User",
+            user.Id,
+            new { CreatedUser = user.Email, AssignedRole = roleName }
+        );
+
+        return Ok(new
+        {
+            message = $"User {user.FullName} ({user.Email}) created successfully as {roleName}.",
+            user = new UserDto
+            {
+                Id = user.Id,
+                Email = user.Email ?? "",
+                FullName = user.FullName,
+                Role = user.Role,
+                JobTitle = user.JobTitle,
+                AvatarUrl = user.AvatarUrl,
+                GitHubUsername = user.GitHubUsername,
+                IsActive = user.IsActive,
+                CreatedAt = user.CreatedAt
+            }
+        });
     }
 
     [AllowAnonymous]

@@ -24,11 +24,16 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   return token ? <>{children}</> : <Navigate to="/login" replace />;
 };
 
-// Simple shell with sidebar for authenticated pages
+import { Navbar } from './components/Navbar';
+
+// Standard layout shell with top navigation for authenticated pages
 const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
-    <div className="min-h-screen bg-[#0B1120] text-slate-100">
-      {children}
+    <div className="min-h-screen bg-[#0B1120] text-slate-100 flex flex-col font-['Inter',sans-serif]">
+      <Navbar />
+      <main className="flex-1 p-6 sm:p-8 max-w-7xl w-full mx-auto">
+        {children}
+      </main>
     </div>
   );
 };

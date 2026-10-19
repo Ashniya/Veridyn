@@ -24,11 +24,13 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(localStorage.getItem('alliure_token'));
+  const [token, setToken] = useState<string | null>(
+    localStorage.getItem('alliure_token') || localStorage.getItem('veridyn_token')
+  );
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const savedUser = localStorage.getItem('alliure_user');
+    const savedUser = localStorage.getItem('alliure_user') || localStorage.getItem('veridyn_user');
     if (savedUser && token) {
       try {
         setUser(JSON.parse(savedUser));
@@ -49,7 +51,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     })();
     const enrichedUser = { ...userData, roleName };
     localStorage.setItem('alliure_token', jwtToken);
+    localStorage.setItem('veridyn_token', jwtToken);
     localStorage.setItem('alliure_user', JSON.stringify(enrichedUser));
+    localStorage.setItem('veridyn_user', JSON.stringify(enrichedUser));
     setToken(jwtToken);
     setUser(enrichedUser);
   };
@@ -57,6 +61,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = () => {
     localStorage.removeItem('alliure_token');
     localStorage.removeItem('alliure_user');
+    localStorage.removeItem('veridyn_token');
+    localStorage.removeItem('veridyn_user');
     setToken(null);
     setUser(null);
     window.location.href = '/login';

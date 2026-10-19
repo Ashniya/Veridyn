@@ -16,8 +16,11 @@ export const RegisterUser: React.FC = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Only admin may access this page
-  if (!isLoading && (!user || user.roleName !== 'Admin')) {
+  // Admin and Project Manager can access this page
+  const isManager = user?.roleName === 'ProjectManager';
+  const isAdmin = user?.roleName === 'Admin';
+
+  if (!isLoading && !isAdmin && !isManager) {
     navigate('/');
     return null;
   }
@@ -27,7 +30,8 @@ export const RegisterUser: React.FC = () => {
     setError('');
     setLoading(true);
     try {
-      const res = await fetch('/api/auth/register', {
+      const assignedRole = isManager ? 'Developer' : role;
+      const res = await fetch('http://localhost:5000/api/auth/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -37,7 +41,7 @@ export const RegisterUser: React.FC = () => {
           email,
           password,
           fullName,
-          role,
+          role: assignedRole,
           jobTitle,
           gitHubUsername: github,
         }),
@@ -46,8 +50,8 @@ export const RegisterUser: React.FC = () => {
         const data = await res.json();
         throw new Error(data.message || 'Failed to register user');
       }
-      // after successful registration, redirect back to admin dashboard
-      navigate('/admin');
+      // after successful registration, redirect back to appropriate dashboard
+      navigate(isManager ? '/manager' : '/admin');
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -101,16 +105,22 @@ export const RegisterUser: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">Role</label>
-              <select
-                value={role}
-                onChange={e => setRole(e.target.value)}
-                className="w-full bg-[#0B1120] border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-sky-500 transition"
-              >
-                <option value="Admin">Admin</option>
-                <option value="ProjectManager">Project Manager</option>
-                <option value="Developer">Developer</option>
-              </select>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">Role Assignment</label>
+              {isManager ? (
+                <div className="w-full bg-[#0B1120] border border-slate-700/80 rounded-xl px-4 py-2.5 text-sm text-sky-400 font-medium">
+                  Developer (Project Managers can only provision Developer accounts)
+                </div>
+              ) : (
+                <select
+                  value={role}
+                  onChange={e => setRole(e.target.value)}
+                  className="w-full bg-[#0B1120] border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-sky-500 transition"
+                >
+                  <option value="ProjectManager">Project Manager</option>
+                  <option value="Developer">Developer</option>
+                  <option value="Admin">Admin</option>
+                </select>
+              )}
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1.5">Job Title (optional)</label>
