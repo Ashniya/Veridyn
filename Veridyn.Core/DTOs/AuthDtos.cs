@@ -11,11 +11,17 @@ public class LoginRequest
 public class RegisterRequest
 {
     public string Email { get; set; } = string.Empty;
-    public string Password { get; set; } = string.Empty;
     public string FullName { get; set; } = string.Empty;
-    public UserRoleType Role { get; set; } = UserRoleType.Developer;
+    public string? Password { get; set; }
     public string? JobTitle { get; set; }
     public string? GitHubUsername { get; set; }
+    public UserRoleType Role { get; set; } = UserRoleType.Developer;
+}
+
+public class ChangePasswordRequest
+{
+    public string CurrentPassword { get; set; } = string.Empty;
+    public string NewPassword { get; set; } = string.Empty;
 }
 
 public class AuthResponse

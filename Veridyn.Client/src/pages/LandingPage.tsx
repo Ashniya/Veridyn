@@ -70,9 +70,14 @@ export const LandingPage: React.FC = () => {
       <LoadingScreen onComplete={() => setIntroComplete(true)} />
 
       <div
-        className={`min-h-screen ${themeBg} ${themeText} font-['Inter',sans-serif] antialiased transition-colors duration-500 overflow-x-hidden ${
-          introComplete ? 'opacity-100' : 'opacity-0'
-        }`}
+        className={`min-h-screen ${themeBg} ${themeText} font-['Inter',sans-serif] antialiased transition-colors duration-500 overflow-x-hidden`}
+        style={{
+          opacity: introComplete ? 1 : 0,
+          transform: introComplete ? 'translateY(0)' : 'translateY(32px)',
+          transition: introComplete
+            ? 'opacity 0.9s cubic-bezier(0.16,1,0.3,1), transform 0.9s cubic-bezier(0.16,1,0.3,1)'
+            : 'none',
+        }}
       >
         {/* NAVBAR */}
         <nav className={`fixed top-0 left-0 w-full z-50 px-8 py-5 flex justify-between items-center transition-all duration-300 backdrop-blur-md ${isDarkMode ? 'bg-[#0B1120]/80 border-b border-slate-800/80' : 'bg-[#F7F7F7]/80'}`}>
@@ -370,7 +375,7 @@ export const LandingPage: React.FC = () => {
               Alliure
            </div>
            <p className={`text-[10px] font-semibold tracking-widest uppercase ${themeMuted}`}>
-             © 2026 Alliure Systems // Veridyn Core
+             © 2026 Alliure Systems // Alliure Core
            </p>
         </footer>
 

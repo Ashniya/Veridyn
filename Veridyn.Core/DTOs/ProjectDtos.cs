@@ -5,7 +5,7 @@ namespace Veridyn.Core.DTOs;
 public class CreateProjectDto
 {
     public string Name { get; set; } = string.Empty;
-    public string Key { get; set; } = string.Empty;
+    public string? Key { get; set; }
     public string Description { get; set; } = string.Empty;
     public DateTime StartDate { get; set; } = DateTime.UtcNow;
     public DateTime TargetEndDate { get; set; }

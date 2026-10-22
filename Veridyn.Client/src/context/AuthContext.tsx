@@ -1,11 +1,11 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import api from '../services/api';
 
-export interface User {
+interface User {
   id: string;
   email: string;
   fullName: string;
-  role: number;
+  role: number | string;
   roleName: string;
   jobTitle?: string;
   avatarUrl?: string;
@@ -15,7 +15,7 @@ export interface User {
 interface AuthContextType {
   user: User | null;
   token: string | null;
-  login: (email: string, password: string) => Promise<any>;
+  login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   isLoading: boolean;
 }
@@ -44,10 +44,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, password: string) => {
     const res = await api.post('/auth/login', { email, password });
     const { token: jwtToken, user: userData } = res.data;
-    // Backend now returns role as a string (e.g., "Admin")
     const roleName = typeof userData.role === 'string' ? userData.role : (() => {
-      const map: { [key: number]: string } = { 0: 'Admin', 1: 'ProjectManager', 2: 'Developer' };
-      return map[userData.role] ?? 'User';
+      const map: { [key: number]: string } = { 1: 'Admin', 2: 'ProjectManager', 3: 'Developer' };
+      return map[userData.role] ?? 'Admin';
     })();
     const enrichedUser = { ...userData, roleName };
     localStorage.setItem('alliure_token', jwtToken);

@@ -43,8 +43,21 @@ public class GitHubController : ControllerBase
     public async Task<ActionResult<List<GitHubCommitDto>>> GetCommits([FromQuery] int? projectId, [FromQuery] int? taskId)
     {
         var query = _context.GitHubCommits.Include(c => c.TaskItem).AsQueryable();
-        if (taskId.HasValue) query = query.Where(c => c.TaskItemId == taskId.Value);
-        else if (projectId.HasValue) query = query.Where(c => c.TaskItem != null && c.TaskItem.ProjectId == projectId.Value);
+        if (taskId.HasValue)
+        {
+            query = query.Where(c => c.TaskItemId == taskId.Value);
+        }
+        else if (projectId.HasValue)
+        {
+            var project = await _context.Projects.FindAsync(projectId.Value);
+            string? repoName = (project != null && !string.IsNullOrWhiteSpace(project.GitHubRepoOwner) && !string.IsNullOrWhiteSpace(project.GitHubRepoName))
+                ? $"{project.GitHubRepoOwner}/{project.GitHubRepoName}".ToLower()
+                : null;
+
+            query = query.Where(c => 
+                (c.TaskItem != null && c.TaskItem.ProjectId == projectId.Value) ||
+                (repoName != null && c.RepositoryName.ToLower() == repoName));
+        }
         var list = await query.OrderByDescending(c => c.CommitDate).Take(100).ToListAsync();
         return Ok(list.Select(c => new GitHubCommitDto
         {
@@ -59,7 +72,7 @@ public class GitHubController : ControllerBase
             LinesDeleted = c.LinesDeleted,
             HtmlUrl = c.HtmlUrl,
             TaskItemId = c.TaskItemId,
-            MatchedTaskCode = c.MatchedTaskCode,
+            MatchedTaskCode = c.MatchedTaskCode ?? c.TaskItem?.TaskCode,
             SyncedAt = c.SyncedAt
         }).ToList());
     }

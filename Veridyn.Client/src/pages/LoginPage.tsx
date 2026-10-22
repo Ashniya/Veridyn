@@ -24,7 +24,7 @@ export const LoginPage: React.FC = () => {
       desc: 'Supervise tenant telemetry, full audit logs & user governance.',
       icon: Shield,
       color: 'sky',
-      demoEmail: 'admin@veridyn.com',
+      demoEmail: 'admin@alliure.com',
       demoPass: 'Admin@12345',
       target: '/admin'
     },

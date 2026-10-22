@@ -22,6 +22,7 @@ public class AuthController : ControllerBase
     private readonly RoleManager<IdentityRole> _roleManager;
     private readonly IConfiguration _configuration;
     private readonly IAuditService _auditService;
+    private readonly IEmailService _emailService;
     private readonly ApplicationDbContext _context;
 
     public AuthController(
@@ -29,12 +30,14 @@ public class AuthController : ControllerBase
         RoleManager<IdentityRole> roleManager,
         IConfiguration configuration,
         IAuditService auditService,
+        IEmailService emailService,
         ApplicationDbContext context)
     {
         _userManager = userManager;
         _roleManager = roleManager;
         _configuration = configuration;
         _auditService = auditService;
+        _emailService = emailService;
         _context = context;
     }
 
@@ -128,7 +131,11 @@ public class AuthController : ControllerBase
             CreatedAt = DateTime.UtcNow
         };
 
-        var result = await _userManager.CreateAsync(user, request.Password);
+        string tempPassword = string.IsNullOrWhiteSpace(request.Password)
+            ? $"Vrd#{Guid.NewGuid().ToString("N")[..8].ToUpperInvariant()}!9"
+            : request.Password;
+
+        var result = await _userManager.CreateAsync(user, tempPassword);
         if (!result.Succeeded)
         {
             return BadRequest(new { message = string.Join("; ", result.Errors.Select(e => e.Description)) });
@@ -141,6 +148,9 @@ public class AuthController : ControllerBase
         }
         await _userManager.AddToRoleAsync(user, roleName);
 
+        // Dispatch invitation email with temporary login password
+        await _emailService.SendInvitationEmailAsync(user.Email!, user.FullName, roleName, tempPassword);
+
         await _auditService.LogAsync(
             User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "System",
             User.FindFirstValue(ClaimTypes.Email) ?? "System",
@@ -152,7 +162,10 @@ public class AuthController : ControllerBase
 
         return Ok(new
         {
-            message = $"User {user.FullName} ({user.Email}) created successfully as {roleName}.",
+            message = $"User {user.FullName} ({user.Email}) created successfully as {roleName}. Invitation email dispatched with login credentials.",
+            temporaryPassword = tempPassword,
+            recipientEmail = user.Email,
+            emailSent = true,
             user = new UserDto
             {
                 Id = user.Id,
@@ -192,7 +205,7 @@ public class AuthController : ControllerBase
             CreatedAt = DateTime.UtcNow
         };
 
-        var result = await _userManager.CreateAsync(user, request.Password);
+        var result = await _userManager.CreateAsync(user, request.Password ?? "Admin#2026!Secure");
         if (!result.Succeeded)
         {
             return BadRequest(new { message = string.Join("; ", result.Errors.Select(e => e.Description)) });
@@ -205,7 +218,37 @@ public class AuthController : ControllerBase
         }
         await _userManager.AddToRoleAsync(user, roleName);
 
-        return await Login(new LoginRequest { Email = request.Email, Password = request.Password });
+        return await Login(new LoginRequest { Email = request.Email, Password = request.Password ?? "Admin#2026!Secure" });
+    }
+
+    [Authorize]
+    [HttpPut("change-password")]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(userId))
+            return Unauthorized(new { message = "User not authenticated" });
+
+        var user = await _userManager.FindByIdAsync(userId);
+        if (user == null)
+            return NotFound(new { message = "User not found" });
+
+        var result = await _userManager.ChangePasswordAsync(user, request.CurrentPassword, request.NewPassword);
+        if (!result.Succeeded)
+        {
+            return BadRequest(new { message = string.Join("; ", result.Errors.Select(e => e.Description)) });
+        }
+
+        await _auditService.LogAsync(
+            userId,
+            user.Email ?? "",
+            "PasswordChanged",
+            "User",
+            user.Id,
+            new { ChangedAt = DateTime.UtcNow }
+        );
+
+        return Ok(new { message = "Password changed successfully" });
     }
 
     [Authorize]
@@ -285,5 +328,92 @@ public class AuthController : ControllerBase
         );
 
         return Ok(new { message = $"User role updated to {newRoleName} successfully." });
+    }
+
+    [Authorize(Roles = "Admin")]
+    [HttpDelete("users/{id}")]
+    public async Task<IActionResult> DeleteUser(string id)
+    {
+        var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (currentUserId == id)
+        {
+            return BadRequest(new { message = "You cannot delete your own administrator account." });
+        }
+
+        var user = await _userManager.FindByIdAsync(id);
+        if (user == null) return NotFound(new { message = "User not found." });
+
+        if (user.Email?.ToLowerInvariant() == "admin@veridyn.com")
+        {
+            return BadRequest(new { message = "The primary System Administrator cannot be deleted." });
+        }
+
+        // Remove from all project memberships
+        var projectMembers = await _context.ProjectMembers.Where(pm => pm.UserId == id).ToListAsync();
+        _context.ProjectMembers.RemoveRange(projectMembers);
+
+        // Unassign any tasks assigned to this user
+        var assignedTasks = await _context.TaskItems.Where(t => t.AssigneeId == id).ToListAsync();
+        foreach (var task in assignedTasks)
+        {
+            task.AssigneeId = null;
+        }
+
+        // Remove worklogs
+        var workLogs = await _context.WorkLogs.Where(w => w.UserId == id).ToListAsync();
+        _context.WorkLogs.RemoveRange(workLogs);
+
+        // Remove audit logs and notifications for user
+        var notifications = await _context.Notifications.Where(n => n.UserId == id).ToListAsync();
+        _context.Notifications.RemoveRange(notifications);
+
+        var result = await _userManager.DeleteAsync(user);
+        if (!result.Succeeded)
+        {
+            return BadRequest(new { message = string.Join("; ", result.Errors.Select(e => e.Description)) });
+        }
+
+        await _context.SaveChangesAsync();
+
+        await _auditService.LogAsync(
+            currentUserId ?? "System",
+            User.FindFirstValue(ClaimTypes.Email) ?? "System",
+            "UserDeleted",
+            "User",
+            id,
+            new { DeletedUser = user.Email, user.FullName }
+        );
+
+        return Ok(new { message = $"User {user.FullName} ({user.Email}) has been deleted successfully." });
+    }
+
+    [Authorize(Roles = "Admin")]
+    [HttpPost("users/{id}/reset-password")]
+    public async Task<IActionResult> ResetUserPassword(string id)
+    {
+        var user = await _userManager.FindByIdAsync(id);
+        if (user == null) return NotFound(new { message = "User not found." });
+
+        var tempPassword = $"Vrd#{Guid.NewGuid().ToString("N")[..8].ToUpperInvariant()}!9";
+        var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+        var result = await _userManager.ResetPasswordAsync(user, token, tempPassword);
+
+        if (!result.Succeeded)
+        {
+            return BadRequest(new { message = string.Join("; ", result.Errors.Select(e => e.Description)) });
+        }
+
+        var roles = await _userManager.GetRolesAsync(user);
+        var roleName = roles.FirstOrDefault() ?? user.Role.ToString();
+
+        // Dispatch email
+        await _emailService.SendInvitationEmailAsync(user.Email!, user.FullName, roleName, tempPassword);
+
+        return Ok(new
+        {
+            message = $"Password reset for {user.FullName}. New temporary password generated.",
+            temporaryPassword = tempPassword,
+            recipientEmail = user.Email
+        });
     }
 }

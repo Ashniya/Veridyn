@@ -75,8 +75,8 @@ public class GitHubService : IGitHubService
             var response = await _httpClient.SendAsync(request, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogWarning("GitHub API responded with status {Status}. Falling back to repository simulation.", response.StatusCode);
-                return await GenerateSimulatedGitHubActivityAsync(project, cancellationToken);
+                _logger.LogWarning("GitHub API responded with status {Status}. Falling back to repository Atom feed.", response.StatusCode);
+                return await SyncViaAtomFeedAsync(project, owner, repo, cancellationToken);
             }
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -143,7 +143,91 @@ public class GitHubService : IGitHubService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error syncing from GitHub API. Providing mock fallback.");
+            _logger.LogError(ex, "Error syncing from GitHub API. Trying Atom feed fallback.");
+            return await SyncViaAtomFeedAsync(project, owner, repo, cancellationToken);
+        }
+    }
+
+    
+    private async Task<GitHubSyncResultDto> SyncViaAtomFeedAsync(Project project, string owner, string repo, CancellationToken cancellationToken)
+    {
+        var result = new GitHubSyncResultDto();
+        try
+        {
+            var atomUrl = $"https://github.com/{owner}/{repo}/commits.atom";
+            var request = new HttpRequestMessage(HttpMethod.Get, atomUrl);
+            request.Headers.UserAgent.Add(new ProductInfoHeaderValue("Mozilla", "5.0"));
+
+            var response = await _httpClient.SendAsync(request, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                return await GenerateSimulatedGitHubActivityAsync(project, cancellationToken);
+            }
+
+            var xmlString = await response.Content.ReadAsStringAsync(cancellationToken);
+            var xdoc = System.Xml.Linq.XDocument.Parse(xmlString);
+            System.Xml.Linq.XNamespace ns = "http://www.w3.org/2005/Atom";
+
+            int syncedCount = 0;
+            var matchedTasks = new HashSet<string>();
+
+            foreach (var entry in xdoc.Root?.Elements(ns + "entry") ?? Enumerable.Empty<System.Xml.Linq.XElement>())
+            {
+                var title = entry.Element(ns + "title")?.Value.Trim() ?? "";
+                var author = entry.Element(ns + "author")?.Element(ns + "name")?.Value.Trim() ?? "Developer";
+                var updatedStr = entry.Element(ns + "updated")?.Value;
+                var date = DateTime.TryParse(updatedStr, out var d) ? d : DateTime.UtcNow;
+                var link = entry.Element(ns + "link")?.Attribute("href")?.Value ?? "";
+
+                var match = System.Text.RegularExpressions.Regex.Match(link, @"/commit/([0-9a-f]{7,40})");
+                string sha = match.Success ? match.Groups[1].Value : Guid.NewGuid().ToString("N")[..12];
+
+                if (await _context.GitHubCommits.AnyAsync(c => c.CommitSha == sha, cancellationToken))
+                {
+                    continue;
+                }
+
+                string? taskCode = ExtractTaskCode(title, project.Key);
+                TaskItem? matchedTask = null;
+                if (!string.IsNullOrWhiteSpace(taskCode))
+                {
+                    matchedTask = project.Tasks.FirstOrDefault(t =>
+                        t.TaskCode.Equals(taskCode, StringComparison.OrdinalIgnoreCase) ||
+                        t.TaskCode.EndsWith(taskCode.TrimStart('#')));
+                }
+
+                var commitEntity = new GitHubCommit
+                {
+                    CommitSha = sha[..Math.Min(sha.Length, 40)],
+                    RepositoryName = $"{owner}/{repo}",
+                    Message = title[..Math.Min(title.Length, 1000)],
+                    AuthorName = author,
+                    CommitDate = date,
+                    HtmlUrl = link,
+                    TaskItemId = matchedTask?.Id,
+                    MatchedTaskCode = matchedTask?.TaskCode ?? taskCode,
+                    SyncedAt = DateTime.UtcNow
+                };
+
+                _context.GitHubCommits.Add(commitEntity);
+                syncedCount++;
+
+                if (matchedTask != null)
+                {
+                    matchedTasks.Add(matchedTask.TaskCode);
+                }
+            }
+
+            await _context.SaveChangesAsync(cancellationToken);
+            result.CommitsSynced = syncedCount;
+            result.AssociatedTasksCount = matchedTasks.Count;
+            result.MatchedTasks = matchedTasks.ToList();
+            result.Message = $"Synced {syncedCount} real commits from {owner}/{repo}.";
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to sync via Atom feed. Falling back to simulation.");
             return await GenerateSimulatedGitHubActivityAsync(project, cancellationToken);
         }
     }

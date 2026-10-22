@@ -1,15 +1,19 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { LandingPage } from './pages/LandingPage';
 import { LoginPage } from './pages/LoginPage';
 import { Dashboard } from './pages/Dashboard';
 import { Projects } from './pages/Projects';
+import { ProjectDetailView } from './pages/ProjectDetailView';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { ManagerDashboard } from './pages/ManagerDashboard';
 import { DeveloperDashboard } from './pages/DeveloperDashboard';
 import { RegisterUser } from './pages/RegisterUser';
 import { AdminSignupPage } from './pages/AdminSignupPage';
+import { Navbar } from './components/Navbar';
+import { Sidebar } from './components/Sidebar';
 
 // Protected route — redirects to /login if no token
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -24,16 +28,42 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   return token ? <>{children}</> : <Navigate to="/login" replace />;
 };
 
-import { Navbar } from './components/Navbar';
-
-// Standard layout shell with top navigation for authenticated pages
+// Layout shell with collapsible/expandable/hideable sidebar & top navbar
 const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isDark } = useTheme();
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState<boolean>(() => {
+    const saved = localStorage.getItem('veridyn-sidebar-expanded');
+    return saved !== null ? saved === 'true' : true;
+  });
+  const [isSidebarHidden, setIsSidebarHidden] = useState<boolean>(false);
+
+  const toggleExpand = () => {
+    setIsSidebarExpanded(prev => {
+      const next = !prev;
+      localStorage.setItem('veridyn-sidebar-expanded', String(next));
+      return next;
+    });
+  };
+
+  const toggleHidden = () => {
+    setIsSidebarHidden(prev => !prev);
+  };
+
   return (
-    <div className="min-h-screen bg-[#0B1120] text-slate-100 flex flex-col font-['Inter',sans-serif]">
-      <Navbar />
-      <main className="flex-1 p-6 sm:p-8 max-w-7xl w-full mx-auto">
-        {children}
-      </main>
+    <div className={`min-h-screen flex flex-col font-['Inter',sans-serif] transition-colors duration-300 ${
+      isDark ? 'bg-[#0B1120] text-slate-100' : 'bg-[#F7F7F7] text-slate-900'
+    }`}>
+      <Navbar onToggleSidebarHidden={toggleHidden} />
+      <div className="flex-1 flex overflow-hidden">
+        <Sidebar 
+          isExpanded={isSidebarExpanded} 
+          onToggleExpand={toggleExpand} 
+          isHidden={isSidebarHidden} 
+        />
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 w-full overflow-y-auto max-w-[1600px] mx-auto">
+          {children}
+        </main>
+      </div>
     </div>
   );
 };
@@ -63,7 +93,18 @@ const AppRoutes: React.FC = () => {
         element={
           <ProtectedRoute>
             <AppShell>
-              <Projects onSelectProject={noop} />
+              <Projects />
+            </AppShell>
+          </ProtectedRoute>
+        }
+      />
+      {/* Dedicated Project Workspace Area */}
+      <Route
+        path="/projects/:id"
+        element={
+          <ProtectedRoute>
+            <AppShell>
+              <ProjectDetailView />
             </AppShell>
           </ProtectedRoute>
         }
@@ -98,7 +139,7 @@ const AppRoutes: React.FC = () => {
           </ProtectedRoute>
         }
       />
-      {/* Register (admin only) */}
+      {/* Provision User (MatDash styled) */}
       <Route
         path="/register"
         element={
@@ -117,10 +158,12 @@ const AppRoutes: React.FC = () => {
 
 export const App: React.FC = () => {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <AppRoutes />
-      </AuthProvider>
-    </BrowserRouter>
+    <ThemeProvider>
+      <BrowserRouter>
+        <AuthProvider>
+          <AppRoutes />
+        </AuthProvider>
+      </BrowserRouter>
+    </ThemeProvider>
   );
 };

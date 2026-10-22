@@ -22,6 +22,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<RiskAssessment> RiskAssessments => Set<RiskAssessment>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<ProjectNote> ProjectNotes => Set<ProjectNote>();
+    public DbSet<ProjectMessage> ProjectMessages => Set<ProjectMessage>();
+    public DbSet<Announcement> Announcements => Set<Announcement>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -165,6 +168,21 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
                   .WithMany(u => u.Notifications)
                   .HasForeignKey(n => n.UserId)
                   .OnDelete(DeleteBehavior.Cascade);
+        });
+        // Announcement
+        builder.Entity<Announcement>(entity =>
+        {
+            entity.HasOne(a => a.Project)
+                  .WithMany()
+                  .HasForeignKey(a => a.ProjectId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(a => a.Author)
+                  .WithMany()
+                  .HasForeignKey(a => a.AuthorId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(a => a.ProjectId);
         });
     }
 }

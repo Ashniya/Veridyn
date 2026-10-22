@@ -151,7 +151,7 @@ public class ProjectsController : ControllerBase
                 FullName = m.User?.FullName ?? "",
                 Email = m.User?.Email ?? "",
                 JobTitle = m.User?.JobTitle,
-                RoleInProject = m.RoleInProject,
+                RoleInProject = (m.User != null && m.User.Role == UserRoleType.Admin) || (m.User != null && m.User.FullName != null && m.User.FullName.Contains("Administrator")) ? UserRoleType.Admin : m.RoleInProject,
                 JoinedAt = m.JoinedAt
             }).ToList(),
             Tasks = p.Tasks.Select(t => new TaskSummaryDto
@@ -192,10 +192,51 @@ public class ProjectsController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<ProjectDto>> CreateProject([FromBody] CreateProjectDto dto)
     {
-        string key = dto.Key.Trim().ToUpperInvariant();
-        if (await _context.Projects.AnyAsync(p => p.Key == key))
+        // 1. Smart GitHub URL parsing
+        if (!string.IsNullOrEmpty(dto.RepositoryUrl))
         {
-            return BadRequest(new { message = $"A project with Key '{key}' already exists." });
+            var cleanUrl = dto.RepositoryUrl.Trim().TrimEnd('/');
+            var match = System.Text.RegularExpressions.Regex.Match(cleanUrl, @"github\.com[/:]([^/]+)/([^/]+?)(?:\.git)?$");
+            if (match.Success)
+            {
+                if (string.IsNullOrEmpty(dto.GitHubRepoOwner)) dto.GitHubRepoOwner = match.Groups[1].Value;
+                if (string.IsNullOrEmpty(dto.GitHubRepoName)) dto.GitHubRepoName = match.Groups[2].Value;
+            }
+        }
+
+        // 2. Smart auto-generated Project Key if omitted or empty
+        string key = dto.Key?.Trim().ToUpperInvariant() ?? "";
+        if (string.IsNullOrEmpty(key))
+        {
+            var words = (dto.Name ?? "PRJ").Split(new[] { ' ', '-', '_' }, StringSplitOptions.RemoveEmptyEntries);
+            if (words.Length >= 2)
+            {
+                key = string.Concat(words.Take(4).Select(w => char.ToUpperInvariant(w[0])));
+            }
+            else if (!string.IsNullOrEmpty(dto.Name) && dto.Name.Length >= 3)
+            {
+                key = new string(dto.Name.Where(char.IsLetterOrDigit).Take(4).ToArray()).ToUpperInvariant();
+            }
+            else
+            {
+                key = "PRJ";
+            }
+
+            var baseKey = string.IsNullOrEmpty(key) ? "PRJ" : key;
+            key = baseKey;
+            int counter = 1;
+            while (await _context.Projects.AnyAsync(p => p.Key == key))
+            {
+                key = $"{baseKey}{counter}";
+                counter++;
+            }
+        }
+        else
+        {
+            if (await _context.Projects.AnyAsync(p => p.Key == key))
+            {
+                return BadRequest(new { message = $"A project with Key '{key}' already exists." });
+            }
         }
 
         var project = new Project
@@ -219,11 +260,16 @@ public class ProjectsController : ControllerBase
         var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (!string.IsNullOrEmpty(currentUserId))
         {
+            var currentUser = await _context.Users.FindAsync(currentUserId);
+            var memberRole = (currentUser?.Role == UserRoleType.Admin || User.IsInRole("Admin") || currentUser?.FullName?.Contains("Administrator") == true)
+                ? UserRoleType.Admin
+                : (currentUser?.Role == UserRoleType.ProjectManager ? UserRoleType.ProjectManager : UserRoleType.Developer);
+
             _context.ProjectMembers.Add(new ProjectMember
             {
                 ProjectId = project.Id,
                 UserId = currentUserId,
-                RoleInProject = UserRoleType.ProjectManager
+                RoleInProject = memberRole
             });
         }
 
@@ -344,4 +390,179 @@ public class ProjectsController : ControllerBase
 
         return NoContent();
     }
+
+    // ── NOTION-STYLE PROJECT NOTES & SCRATCHPAD ──
+    [HttpGet("{id}/notes")]
+    public async Task<ActionResult<ProjectNote>> GetProjectNotes(int id)
+    {
+        var note = await _context.ProjectNotes.FirstOrDefaultAsync(n => n.ProjectId == id);
+        if (note == null)
+        {
+            note = new ProjectNote
+            {
+                ProjectId = id,
+                Content = "# Project Mission & Architecture Notes\n\n- [ ] Sprint Goal: Establish core repository and continuous integration.\n- [ ] Deliverable: Setup domain entities and API endpoints.\n- Key architectural decisions:\n  1. Evidence validation via Git commits.\n  2. Real-time progress auditing.",
+                UpdatedAt = DateTime.UtcNow
+            };
+            _context.ProjectNotes.Add(note);
+            await _context.SaveChangesAsync();
+        }
+        return Ok(note);
+    }
+
+    [HttpPut("{id}/notes")]
+    public async Task<ActionResult<ProjectNote>> UpdateProjectNotes(int id, [FromBody] UpdateProjectNotesDto dto)
+    {
+        var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var note = await _context.ProjectNotes.FirstOrDefaultAsync(n => n.ProjectId == id);
+        if (note == null)
+        {
+            note = new ProjectNote
+            {
+                ProjectId = id,
+                Content = dto.Content,
+                UpdatedAt = DateTime.UtcNow,
+                UpdatedByUserId = currentUserId
+            };
+            _context.ProjectNotes.Add(note);
+        }
+        else
+        {
+            note.Content = dto.Content;
+            note.UpdatedAt = DateTime.UtcNow;
+            note.UpdatedByUserId = currentUserId;
+        }
+
+        // Notify all project members of the announcement
+        var project = await _context.Projects
+            .Include(p => p.Members)
+            .FirstOrDefaultAsync(p => p.Id == id);
+
+        if (project != null)
+        {
+            var author = await _context.Users.FindAsync(currentUserId);
+            var authorName = author?.FullName ?? "Team member";
+
+            var memberIds = project.Members.Select(m => m.UserId).ToList();
+
+            foreach (var memberId in memberIds.Distinct())
+            {
+                if (memberId == currentUserId) continue; // Don't notify the author
+
+                _context.Notifications.Add(new Notification
+                {
+                    UserId = memberId,
+                    Title = $"📢 Project Announcement: {project.Name}",
+                    Message = $"{authorName} posted an announcement in {project.Name}",
+                    Type = NotificationType.Info,
+                    CreatedAt = DateTime.UtcNow,
+                    ActionUrl = $"/projects/{id}"
+                });
+            }
+        }
+
+        await _context.SaveChangesAsync();
+        return Ok(note);
+    }
+
+    // ── TEAM DISCUSSION & DIRECT MESSAGING ──
+    [HttpGet("{id}/messages")]
+    public async Task<ActionResult<List<ProjectMessageDto>>> GetProjectMessages(int id)
+    {
+        var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        // Return group messages (RecipientId == null) OR DMs where current user is sender or recipient
+        var messages = await _context.ProjectMessages
+            .Where(m => m.ProjectId == id &&
+                        (m.RecipientId == null || m.RecipientId == "" || m.SenderId == currentUserId || m.RecipientId == currentUserId))
+            .OrderBy(m => m.CreatedAt)
+            .Select(m => new ProjectMessageDto
+            {
+                Id = m.Id,
+                ProjectId = m.ProjectId,
+                SenderId = m.SenderId,
+                SenderName = m.SenderName,
+                SenderRole = (m.SenderRole == "Admin" || (m.SenderName != null && m.SenderName.Contains("Administrator"))) ? "Admin" : m.SenderRole,
+                RecipientId = m.RecipientId,
+                RecipientName = m.RecipientName,
+                Content = m.Content,
+                CreatedAt = m.CreatedAt
+            })
+            .ToListAsync();
+
+        return Ok(messages);
+    }
+
+    [HttpPost("{id}/messages")]
+    public async Task<ActionResult<ProjectMessageDto>> PostProjectMessage(int id, [FromBody] CreateProjectMessageDto dto)
+    {
+        if (string.IsNullOrWhiteSpace(dto.Content))
+        {
+            return BadRequest(new { message = "Message content cannot be empty." });
+        }
+
+        var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+        var currentUser = await _context.Users.FindAsync(currentUserId);
+        var senderName = currentUser?.FullName ?? User.FindFirstValue(ClaimTypes.Email) ?? "User";
+        var senderRole = (currentUser?.Role == UserRoleType.Admin || User.IsInRole("Admin") || (currentUser?.FullName != null && currentUser.FullName.Contains("Administrator"))) ? "Admin" : (currentUser?.Role == UserRoleType.ProjectManager ? "ProjectManager" : "Developer");
+
+        string? recipientName = null;
+        if (!string.IsNullOrEmpty(dto.RecipientId))
+        {
+            var recipient = await _context.Users.FindAsync(dto.RecipientId);
+            recipientName = recipient?.FullName ?? "Team Member";
+        }
+
+        var msg = new ProjectMessage
+        {
+            ProjectId = id,
+            SenderId = currentUserId,
+            SenderName = senderName,
+            SenderRole = senderRole,
+            RecipientId = dto.RecipientId,
+            RecipientName = recipientName,
+            Content = dto.Content.Trim(),
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _context.ProjectMessages.Add(msg);
+        await _context.SaveChangesAsync();
+
+        return Ok(new ProjectMessageDto
+        {
+            Id = msg.Id,
+            ProjectId = msg.ProjectId,
+            SenderId = msg.SenderId,
+            SenderName = msg.SenderName,
+            SenderRole = msg.SenderRole,
+            RecipientId = msg.RecipientId,
+            RecipientName = msg.RecipientName,
+            Content = msg.Content,
+            CreatedAt = msg.CreatedAt
+        });
+    }
+}
+
+public class UpdateProjectNotesDto
+{
+    public string Content { get; set; } = string.Empty;
+}
+
+public class CreateProjectMessageDto
+{
+    public string Content { get; set; } = string.Empty;
+    public string? RecipientId { get; set; }
+}
+
+public class ProjectMessageDto
+{
+    public int Id { get; set; }
+    public int ProjectId { get; set; }
+    public string SenderId { get; set; } = string.Empty;
+    public string SenderName { get; set; } = string.Empty;
+    public string SenderRole { get; set; } = string.Empty;
+    public string? RecipientId { get; set; }
+    public string? RecipientName { get; set; }
+    public string Content { get; set; } = string.Empty;
+    public DateTime CreatedAt { get; set; }
 }

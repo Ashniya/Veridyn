@@ -18,6 +18,7 @@ dist/
 # Build artifacts
 *.log
 npm-debug.log*
+Veridyn.API/wwwroot/
 
 # OS
 .DS_Store

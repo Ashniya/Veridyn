@@ -63,6 +63,7 @@ builder.Services.AddScoped<RuleBasedRiskEngine>();
 builder.Services.AddScoped<IMlPredictionService, MlPredictionService>();
 builder.Services.AddScoped<IGitHubService, GitHubService>();
 builder.Services.AddScoped<IAuditService, AuditService>();
+builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IRiskAnalysisService, RiskAnalysisService>();
 builder.Services.AddHostedService<PeriodicRiskEvaluationWorker>();
 
