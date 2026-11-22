@@ -1,5 +1,6 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -10,6 +11,13 @@ using Veridyn.Infrastructure.Data;
 using Veridyn.Infrastructure.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// ── DATA PROTECTION: store keys locally in the project so it always works ──
+var dpKeysPath = Path.Combine(builder.Environment.ContentRootPath, ".dp-keys");
+Directory.CreateDirectory(dpKeysPath);
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo(dpKeysPath))
+    .SetApplicationName("VeridynApp");
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
     ?? "Server=(localdb)\\mssqllocaldb;Database=VeridynDb;Trusted_Connection=True;MultipleActiveResultSets=true;TrustServerCertificate=True";

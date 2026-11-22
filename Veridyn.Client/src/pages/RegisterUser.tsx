@@ -181,27 +181,33 @@ export const RegisterUser: React.FC = () => {
                 </p>
               </div>
 
-              {/* Full Name */}
+              {/* Full Name / Project Manager Name */}
               <div className="space-y-1.5">
                 <label className={`block text-xs font-bold uppercase tracking-wider ${
                   isDark ? 'text-slate-300' : 'text-slate-700'
                 }`}>
-                  Full Name <span className="text-rose-500">*</span>
+                  {role === 'ProjectManager' ? 'Project Manager Name' : 'Full Name'} <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="text"
                   required
                   value={fullName}
                   onChange={e => setFullName(e.target.value)}
-                  placeholder="e.g. Sarah Jenkins"
+                  placeholder={role === 'ProjectManager' ? "e.g. Sarah Jenkins (Project Manager)" : "e.g. Sarah Jenkins"}
                   className={`w-full px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium border transition focus:outline-none ${
                     isDark 
                       ? 'bg-[#0B1120] border-slate-700 text-white placeholder-slate-600 focus:border-sky-500' 
                       : 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-400 focus:border-sky-600 focus:bg-white'
                   }`}
                 />
-                <p className={`text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                  Enter the contributor's full legal or professional name.
+                <p className={`text-[11px] font-medium ${
+                  role === 'ProjectManager' 
+                    ? 'text-pink-600 dark:text-pink-400' 
+                    : (isDark ? 'text-slate-500' : 'text-slate-400')
+                }`}>
+                  {role === 'ProjectManager' 
+                    ? "✨ Please enter the Project Manager's name so we can describe them with their name throughout project workspaces and manager portals."
+                    : "Enter the contributor's full legal or professional name."}
                 </p>
               </div>
 

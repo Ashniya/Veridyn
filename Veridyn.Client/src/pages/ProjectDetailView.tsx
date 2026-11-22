@@ -4,13 +4,16 @@ import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { RiskBadge } from '../components/RiskBadge';
+import { GitHubIntelligenceStrip } from '../components/GitHubIntelligenceStrip';
+import { ProjectProgressIntelligence } from '../components/ProjectProgressIntelligence';
 import { 
   FolderGit2, Plus, Users, UserPlus, UserMinus, Clock, Calendar, 
   CheckSquare, AlertTriangle, ArrowLeft, Send, MessageSquare, 
   FileText, GitBranch, GitCommit, ExternalLink, RefreshCw, 
   Sparkles, CheckCircle2, User, Hash, Lock, Check, Save, Shield, 
   Briefcase, Code, Bell, Search, Smile, Paperclip, Image as ImageIcon, 
-  MoreVertical, X, Star, Bookmark, Copy, Edit3, Info, Flame, ChevronRight
+  MoreVertical, X, Star, Bookmark, Copy, Edit3, Info, Flame, ChevronRight,
+  BarChart2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -50,7 +53,7 @@ export const ProjectDetailView: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
 
   // Active Main Tab
-  const [activeTab, setActiveTab] = useState<'notes' | 'messages' | 'team' | 'tasks' | 'commits'>('notes');
+  const [activeTab, setActiveTab] = useState<'notes' | 'messages' | 'team' | 'tasks' | 'commits' | 'intelligence'>('notes');
 
   // Git Commits state
   const [commits, setCommits] = useState<any[]>([]);
@@ -71,7 +74,6 @@ export const ProjectDetailView: React.FC = () => {
   const [messageInput, setMessageInput] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
   const [chatSearch, setChatSearch] = useState('');
-  const [showSchedulePanel, setShowSchedulePanel] = useState(true);
 
   // Add Member Modal/Drawer
   const [showAddMember, setShowAddMember] = useState(false);
@@ -473,6 +475,14 @@ export const ProjectDetailView: React.FC = () => {
         </div>
       </div>
 
+      {/* ── ALWAYS-VISIBLE GITHUB INTELLIGENCE STRIP ── */}
+      <GitHubIntelligenceStrip
+        projectId={Number(id)}
+        projectKey={project.key}
+        repositoryUrl={project.repositoryUrl}
+        canSync={canManage}
+      />
+
       {/* ── PROJECT WORKSPACE TABS (INTERACTIVE PILL DESIGN) ── */}
       <div className={`flex flex-wrap items-center gap-2 p-2 rounded-2xl border transition-all ${
         isDark ? 'bg-[#0B1120] border-slate-800 shadow-inner' : 'bg-slate-100 border-slate-200 shadow-inner'
@@ -482,7 +492,8 @@ export const ProjectDetailView: React.FC = () => {
           { key: 'messages', icon: MessageSquare, label: 'Group Chat & Direct Messages', badge: messages.length > 0 ? messages.length : null },
           { key: 'team', icon: Users, label: `Developers & Team (${project.members?.length || 0})`, badge: null },
           { key: 'tasks', icon: CheckSquare, label: `Work Deliverables (${project.tasks?.length || 0})`, badge: null },
-          { key: 'commits', icon: GitCommit, label: 'Git Activity', badge: commits.length > 0 ? commits.length : null },
+          { key: 'intelligence', icon: BarChart2, label: 'Progress Intelligence', badge: (project.highRiskTasksCount || 0) > 0 ? project.highRiskTasksCount : null },
+          { key: 'commits', icon: GitCommit, label: 'Full Git Log', badge: commits.length > 0 ? commits.length : null },
         ].map(({ key, icon: Icon, label, badge }) => {
           const isActive = activeTab === key;
           return (
@@ -670,22 +681,9 @@ export const ProjectDetailView: React.FC = () => {
               </span>
             </div>
 
-            {/* Right User Status & Reminder Toggle */}
+            {/* Right User Status */}
             <div className="flex items-center gap-3">
-              <button
-                onClick={() => setShowSchedulePanel(!showSchedulePanel)}
-                className={`p-2 rounded-xl border text-xs font-bold transition flex items-center gap-1.5 ${
-                  showSchedulePanel
-                    ? isDark ? 'bg-sky-500/20 text-sky-400 border-sky-500/30' : 'bg-sky-50 text-sky-700 border-sky-200'
-                    : isDark ? 'border-slate-700 text-slate-400 hover:text-white' : 'border-slate-200 text-slate-600'
-                }`}
-                title="Toggle Milestones & Reminders"
-              >
-                <Calendar size={14} />
-                <span className="hidden md:inline">Milestones</span>
-              </button>
-
-              <div className="flex items-center gap-2.5 pl-2 border-l border-slate-700/60">
+              <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-sky-500 flex items-center justify-center text-white font-bold text-xs shadow-sm">
                   {user?.fullName?.charAt(0) || 'U'}
                 </div>
@@ -1021,111 +1019,6 @@ export const ProjectDetailView: React.FC = () => {
                 </div>
               </form>
             </div>
-
-            {/* ── COLUMN 3: SCHEDULE REMINDER / SPRINTS PANEL (MATCHING REFERENCE IMAGE) ── */}
-            {showSchedulePanel && (
-              <motion.div
-                initial={{ width: 0, opacity: 0 }}
-                animate={{ width: 310, opacity: 1 }}
-                exit={{ width: 0, opacity: 0 }}
-                className={`shrink-0 border-l p-5 space-y-4 overflow-y-auto hidden xl:block ${
-                  isDark ? 'border-slate-800 bg-[#0B1120]' : 'border-slate-200 bg-white'
-                }`}
-              >
-                <div className="flex items-center justify-between pb-2 border-b border-slate-700/50">
-                  <h4 className={`text-xs font-extrabold uppercase tracking-wider ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                    Schedule Reminder
-                  </h4>
-                  <button
-                    onClick={() => setShowSchedulePanel(false)}
-                    className={`p-1 rounded-lg transition ${isDark ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'}`}
-                  >
-                    <X size={15} />
-                  </button>
-                </div>
-
-                {/* Card 1: Lavender / Violet Reminder Card */}
-                <div className={`p-4 rounded-3xl space-y-3 transition border ${
-                  isDark
-                    ? 'bg-gradient-to-br from-[#1E1B4B]/80 to-[#2E1065]/60 border-indigo-800/40 text-slate-100'
-                    : 'bg-[#EDE9FE] border-indigo-200/80 text-indigo-950'
-                }`}>
-                  <div className="flex items-center justify-between">
-                    <div className="w-8 h-8 rounded-2xl bg-white/90 text-indigo-600 flex items-center justify-center shadow-xs">
-                      <Bookmark size={16} />
-                    </div>
-                    <span className="text-[10px] font-bold opacity-75">
-                      {project.targetEndDate ? new Date(project.targetEndDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Sprint Cycle'}
-                    </span>
-                  </div>
-                  <div>
-                    <h5 className="font-extrabold text-sm">Sprint Milestone</h5>
-                    <p className="text-[11px] opacity-80 mt-1 leading-snug">
-                      Deliver continuous verified Git evidence and close high-priority deliverables.
-                    </p>
-                  </div>
-                  <div className="flex items-center justify-between pt-2 border-t border-indigo-300/40 dark:border-indigo-800/40">
-                    <span className="flex items-center gap-1 text-[11px] font-bold">
-                      <Star size={12} className="fill-amber-400 text-amber-400" />
-                      4.9 Priority
-                    </span>
-                    <span className="text-[10px] font-bold">
-                      {project.totalTasks || 0} Deliverables
-                    </span>
-                  </div>
-                </div>
-
-                {/* Card 2: Amber / Yellow Reminder Card */}
-                <div className={`p-4 rounded-3xl space-y-3 transition border ${
-                  isDark
-                    ? 'bg-gradient-to-br from-[#451A03]/80 to-[#78350F]/60 border-amber-800/40 text-slate-100'
-                    : 'bg-[#FEF08A] border-amber-200/80 text-amber-950'
-                }`}>
-                  <div className="flex items-center justify-between">
-                    <div className="w-8 h-8 rounded-2xl bg-white/90 text-amber-600 flex items-center justify-center shadow-xs">
-                      <Flame size={16} />
-                    </div>
-                    <span className="text-[10px] font-bold opacity-75">
-                      Target: Next 48h
-                    </span>
-                  </div>
-                  <div>
-                    <h5 className="font-extrabold text-sm">Code Verification</h5>
-                    <p className="text-[11px] opacity-80 mt-1 leading-snug">
-                      Push git commits linking to task IDs to boost automated evidence telemetry.
-                    </p>
-                  </div>
-                  <div className="flex items-center justify-between pt-2 border-t border-amber-300/40 dark:border-amber-800/40">
-                    <span className="flex items-center gap-1 text-[11px] font-bold">
-                      <Star size={12} className="fill-amber-500 text-amber-500" />
-                      Live Auditing
-                    </span>
-                    <span className="text-[10px] font-bold">
-                      {commits.length} Git Commits
-                    </span>
-                  </div>
-                </div>
-
-                {/* Quick Telemetry Pill Card */}
-                <div className={`p-3.5 rounded-2xl border ${
-                  isDark ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200'
-                }`}>
-                  <div className="text-[10px] font-bold uppercase tracking-wider mb-2 text-slate-400">
-                    Project Radar
-                  </div>
-                  <div className="space-y-1.5 text-xs">
-                    <div className="flex items-center justify-between">
-                      <span className={isDark ? 'text-slate-400' : 'text-slate-600'}>Evidence Index:</span>
-                      <span className="font-bold text-emerald-500">{Math.round(project.overallEvidenceScore || 0)}%</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className={isDark ? 'text-slate-400' : 'text-slate-600'}>Completed Tasks:</span>
-                      <span className="font-bold">{project.completedTasks || 0} / {project.totalTasks || 0}</span>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            )}
           </div>
         </motion.div>
       )}
@@ -1318,7 +1211,17 @@ export const ProjectDetailView: React.FC = () => {
         </motion.div>
       )}
 
-      {/* ── TAB 5: GIT ACTIVITY (HIGHLY INTERACTIVE REPOSITORY FEED) ── */}
+      {/* ── TAB 5: PROGRESS INTELLIGENCE ── */}
+      {activeTab === 'intelligence' && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <ProjectProgressIntelligence project={project} commits={commits} />
+        </motion.div>
+      )}
+
+      {/* ── TAB 6: GIT ACTIVITY (HIGHLY INTERACTIVE REPOSITORY FEED) ── */}
       {activeTab === 'commits' && (
         <motion.div
           initial={{ opacity: 0, y: 8 }}

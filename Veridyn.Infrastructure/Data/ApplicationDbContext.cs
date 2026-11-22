@@ -72,7 +72,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             entity.HasOne(t => t.Creator)
                   .WithMany()
                   .HasForeignKey(t => t.CreatorId)
-                  .OnDelete(DeleteBehavior.Restrict);
+                  .OnDelete(DeleteBehavior.SetNull);
         });
 
         // Subtask

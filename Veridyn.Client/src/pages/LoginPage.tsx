@@ -51,8 +51,13 @@ export const LoginPage: React.FC = () => {
   const handleSelectRole = (role: RoleType) => {
     setSelectedRole(role);
     setError('');
-    setEmail(roleMeta[role].demoEmail);
-    setPassword(roleMeta[role].demoPass);
+    if (role === 'Admin') {
+      setEmail(roleMeta.Admin.demoEmail);
+      setPassword(roleMeta.Admin.demoPass);
+    } else {
+      setEmail('');
+      setPassword('');
+    }
   };
 
   const handleClearRole = () => {
@@ -72,6 +77,7 @@ export const LoginPage: React.FC = () => {
       const userObj = stored ? JSON.parse(stored) : {};
       const roleName = userObj.roleName;
 
+      // Navigate to the user's actual dashboard (no cross-role blocking)
       let target = '/dashboard';
       if (roleName === 'Admin') target = '/admin';
       else if (roleName === 'ProjectManager') target = '/manager';
@@ -349,7 +355,7 @@ export const LoginPage: React.FC = () => {
                         required
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        placeholder={roleMeta[selectedRole].demoEmail}
+                        placeholder="please enter email"
                         className={`w-full px-5 py-3.5 rounded-full border text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white ${themeInputBg}`}
                       />
                     </div>
@@ -364,7 +370,7 @@ export const LoginPage: React.FC = () => {
                           required
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
-                          placeholder="••••••••"
+                          placeholder="please enter password"
                           className={`w-full px-5 py-3.5 rounded-full border text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white pr-12 ${themeInputBg}`}
                         />
                         <button

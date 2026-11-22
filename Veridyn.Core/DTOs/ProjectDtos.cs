@@ -13,6 +13,7 @@ public class CreateProjectDto
     public string? RepositoryUrl { get; set; }
     public string? GitHubRepoOwner { get; set; }
     public string? GitHubRepoName { get; set; }
+    public string? ProjectManagerUserId { get; set; }
     public List<string>? MemberUserIds { get; set; }
 }
 
@@ -55,6 +56,8 @@ public class ProjectDto
     public double TotalEstimatedHours { get; set; }
     public RiskLevel ProjectRiskLevel { get; set; } = RiskLevel.Low;
     public int MemberCount { get; set; }
+    public string? ProjectManagerName { get; set; }
+    public string? ProjectManagerUserId { get; set; }
 }
 
 public class ProjectDetailDto : ProjectDto

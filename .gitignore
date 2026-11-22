@@ -7,6 +7,8 @@ obj/
 *.db
 *.db-shm
 *.db-wal
+.dp-keys/
+**/[Dd]ata[Pp]rotection-keys/
 
 # Node / React
 node_modules/

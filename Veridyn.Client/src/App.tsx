@@ -2,6 +2,10 @@ import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
+import { StickyNotesProvider, useStickyNotes } from './context/StickyNotesContext';
+import { DeveloperStickyNotes } from './components/DeveloperStickyNotes';
+import { StickyNote } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { LandingPage } from './pages/LandingPage';
 import { LoginPage } from './pages/LoginPage';
 import { Dashboard } from './pages/Dashboard';
@@ -15,9 +19,9 @@ import { AdminSignupPage } from './pages/AdminSignupPage';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
 
-// Protected route — redirects to /login if no token
-const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { token, isLoading } = useAuth();
+// Protected route — redirects to /login if no token, or user's home dashboard if role mismatch
+const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRoles?: string[] }> = ({ children, allowedRoles }) => {
+  const { token, isLoading, user } = useAuth();
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[#0B1120] flex items-center justify-center">
@@ -25,12 +29,24 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
       </div>
     );
   }
-  return token ? <>{children}</> : <Navigate to="/login" replace />;
+  if (!token) return <Navigate to="/login" replace />;
+
+  if (allowedRoles && user && !allowedRoles.includes(user.roleName)) {
+    let redirectPath = '/dashboard';
+    if (user.roleName === 'Admin') redirectPath = '/admin';
+    else if (user.roleName === 'ProjectManager') redirectPath = '/manager';
+    else if (user.roleName === 'Developer') redirectPath = '/dev';
+    return <Navigate to={redirectPath} replace />;
+  }
+
+  return <>{children}</>;
 };
 
 // Layout shell with collapsible/expandable/hideable sidebar & top navbar
 const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isDark } = useTheme();
+  const { user } = useAuth();
+  const { isOpen, closeNotes, toggleNotes } = useStickyNotes();
   const [isSidebarExpanded, setIsSidebarExpanded] = useState<boolean>(() => {
     const saved = localStorage.getItem('veridyn-sidebar-expanded');
     return saved !== null ? saved === 'true' : true;
@@ -49,21 +65,47 @@ const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     setIsSidebarHidden(prev => !prev);
   };
 
+  const role = user?.role;
+  const roleName = user?.roleName;
+  const isDev = role === 3 || roleName === 'Developer' || role === 1 || roleName === 'Admin';
+
   return (
-    <div className={`min-h-screen flex flex-col font-['Inter',sans-serif] transition-colors duration-300 ${
-      isDark ? 'bg-[#0B1120] text-slate-100' : 'bg-[#F7F7F7] text-slate-900'
+    <div className={`h-screen w-screen flex overflow-hidden font-['Inter',sans-serif] transition-colors duration-300 relative ${
+      isDark ? 'bg-[#0B1120] text-slate-100' : 'bg-white text-slate-900'
     }`}>
-      <Navbar onToggleSidebarHidden={toggleHidden} />
-      <div className="flex-1 flex overflow-hidden">
-        <Sidebar 
-          isExpanded={isSidebarExpanded} 
-          onToggleExpand={toggleExpand} 
-          isHidden={isSidebarHidden} 
-        />
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 w-full overflow-y-auto max-w-[1600px] mx-auto">
+      {/* Floating Curved-Border Sidebar */}
+      <Sidebar 
+        isExpanded={isSidebarExpanded} 
+        onToggleExpand={toggleExpand} 
+        isHidden={isSidebarHidden} 
+      />
+      {/* Main Content & Top Header Area (compresses when sticky notes panel opens) */}
+      <div 
+        className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
+        style={{ marginRight: isDev && isOpen ? 380 : 0 }}
+      >
+        <Navbar onToggleSidebarHidden={toggleHidden} />
+        <main className="flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5 lg:px-8 max-w-[1720px] w-full mx-auto">
           {children}
         </main>
       </div>
+
+      {/* Global Sticky Notes Panel & Bottom-Right Corner Launcher for Developers */}
+      {isDev && (
+        <>
+          <motion.button
+            whileHover={{ scale: 1.08 }}
+            whileTap={{ scale: 0.92 }}
+            onClick={toggleNotes}
+            title={isOpen ? "Close Sticky Notes" : "Open Sticky Notes"}
+            className="fixed bottom-6 right-6 z-40 w-12 h-12 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 shadow-2xl flex items-center justify-center border border-amber-300/80 transition-all cursor-pointer group"
+          >
+            <StickyNote size={22} className="text-amber-950 group-hover:rotate-6 transition-transform" />
+          </motion.button>
+
+          <DeveloperStickyNotes isOpen={isOpen} onClose={closeNotes} />
+        </>
+      )}
     </div>
   );
 };
@@ -112,7 +154,7 @@ const AppRoutes: React.FC = () => {
       <Route
         path="/admin"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={['Admin']}>
             <AppShell>
               <AdminDashboard />
             </AppShell>
@@ -122,7 +164,7 @@ const AppRoutes: React.FC = () => {
       <Route
         path="/manager"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={['ProjectManager']}>
             <AppShell>
               <ManagerDashboard />
             </AppShell>
@@ -132,7 +174,7 @@ const AppRoutes: React.FC = () => {
       <Route
         path="/dev"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={['Developer', 'Admin']}>
             <AppShell>
               <DeveloperDashboard />
             </AppShell>
@@ -161,7 +203,9 @@ export const App: React.FC = () => {
     <ThemeProvider>
       <BrowserRouter>
         <AuthProvider>
-          <AppRoutes />
+          <StickyNotesProvider>
+            <AppRoutes />
+          </StickyNotesProvider>
         </AuthProvider>
       </BrowserRouter>
     </ThemeProvider>

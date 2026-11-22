@@ -343,7 +343,8 @@ public class AuthController : ControllerBase
         var user = await _userManager.FindByIdAsync(id);
         if (user == null) return NotFound(new { message = "User not found." });
 
-        if (user.Email?.ToLowerInvariant() == "admin@veridyn.com")
+        if (user.Email?.ToLowerInvariant() == "admin@veridyn.com" ||
+            user.Email?.ToLowerInvariant() == "admin@alliure.com")
         {
             return BadRequest(new { message = "The primary System Administrator cannot be deleted." });
         }
@@ -359,21 +360,46 @@ public class AuthController : ControllerBase
             task.AssigneeId = null;
         }
 
+        // Null out CreatorId on tasks created by this user (FK is Restrict, so must clear)
+        var createdTasks = await _context.TaskItems.Where(t => t.CreatorId == id).ToListAsync();
+        foreach (var task in createdTasks)
+        {
+            task.CreatorId = null;
+        }
+
         // Remove worklogs
         var workLogs = await _context.WorkLogs.Where(w => w.UserId == id).ToListAsync();
         _context.WorkLogs.RemoveRange(workLogs);
 
-        // Remove audit logs and notifications for user
+        // Remove daily progress updates
+        var dailyUpdates = await _context.DailyProgressUpdates.Where(d => d.UserId == id).ToListAsync();
+        _context.DailyProgressUpdates.RemoveRange(dailyUpdates);
+
+        // Remove project messages sent by or directed to this user
+        var messages = await _context.ProjectMessages
+            .Where(m => m.SenderId == id || m.RecipientId == id).ToListAsync();
+        _context.ProjectMessages.RemoveRange(messages);
+
+        // Remove announcements authored by this user
+        var announcements = await _context.Announcements.Where(a => a.AuthorId == id).ToListAsync();
+        _context.Announcements.RemoveRange(announcements);
+
+        // Remove notifications for user
         var notifications = await _context.Notifications.Where(n => n.UserId == id).ToListAsync();
         _context.Notifications.RemoveRange(notifications);
+
+        // Remove audit logs by this user (non-critical historical data)
+        var auditLogs = await _context.AuditLogs.Where(a => a.UserId == id).ToListAsync();
+        _context.AuditLogs.RemoveRange(auditLogs);
+
+        // Save all FK cleanup before deleting the Identity user
+        await _context.SaveChangesAsync();
 
         var result = await _userManager.DeleteAsync(user);
         if (!result.Succeeded)
         {
             return BadRequest(new { message = string.Join("; ", result.Errors.Select(e => e.Description)) });
         }
-
-        await _context.SaveChangesAsync();
 
         await _auditService.LogAsync(
             currentUserId ?? "System",

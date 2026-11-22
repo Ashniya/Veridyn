@@ -37,6 +37,7 @@ public class ProjectsController : ControllerBase
 
         var query = _context.Projects
             .Include(p => p.Members)
+                .ThenInclude(m => m.User)
             .Include(p => p.Tasks)
             .AsQueryable();
 
@@ -85,7 +86,10 @@ public class ProjectsController : ControllerBase
                 TotalActualHours = Math.Round(p.Tasks.Sum(t => t.ActualHours), 1),
                 TotalEstimatedHours = Math.Round(p.Tasks.Sum(t => t.EstimatedHours), 1),
                 ProjectRiskLevel = risk,
-                MemberCount = p.Members.Count
+                MemberCount = p.Members.Count,
+                ProjectManagerName = p.Members.FirstOrDefault(m => m.RoleInProject == UserRoleType.ProjectManager)?.User?.FullName 
+                    ?? p.Members.FirstOrDefault(m => m.User?.Role == UserRoleType.ProjectManager)?.User?.FullName,
+                ProjectManagerUserId = p.Members.FirstOrDefault(m => m.RoleInProject == UserRoleType.ProjectManager)?.UserId
             };
         }).ToList();
 
@@ -143,6 +147,9 @@ public class ProjectsController : ControllerBase
             TotalEstimatedHours = Math.Round(p.Tasks.Sum(t => t.EstimatedHours), 1),
             ProjectRiskLevel = risk,
             MemberCount = p.Members.Count,
+            ProjectManagerName = p.Members.FirstOrDefault(m => m.RoleInProject == UserRoleType.ProjectManager)?.User?.FullName 
+                ?? p.Members.FirstOrDefault(m => m.User?.Role == UserRoleType.ProjectManager)?.User?.FullName,
+            ProjectManagerUserId = p.Members.FirstOrDefault(m => m.RoleInProject == UserRoleType.ProjectManager)?.UserId,
             Members = p.Members.Select(m => new ProjectMemberDto
             {
                 Id = m.Id,
@@ -273,9 +280,27 @@ public class ProjectsController : ControllerBase
             });
         }
 
+        if (!string.IsNullOrEmpty(dto.ProjectManagerUserId))
+        {
+            var existingPm = await _context.ProjectMembers.FirstOrDefaultAsync(m => m.ProjectId == project.Id && m.UserId == dto.ProjectManagerUserId);
+            if (existingPm != null)
+            {
+                existingPm.RoleInProject = UserRoleType.ProjectManager;
+            }
+            else
+            {
+                _context.ProjectMembers.Add(new ProjectMember
+                {
+                    ProjectId = project.Id,
+                    UserId = dto.ProjectManagerUserId,
+                    RoleInProject = UserRoleType.ProjectManager
+                });
+            }
+        }
+
         if (dto.MemberUserIds != null)
         {
-            foreach (var userId in dto.MemberUserIds.Where(u => u != currentUserId))
+            foreach (var userId in dto.MemberUserIds.Where(u => u != currentUserId && u != dto.ProjectManagerUserId))
             {
                 _context.ProjectMembers.Add(new ProjectMember
                 {

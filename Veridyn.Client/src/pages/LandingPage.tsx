@@ -1,12 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LoadingScreen } from '../components/LoadingScreen';
+import ScrollExpand from '../components/ScrollExpand';
+import StrokeText from '../components/StrokeText';
+import DepthText from '../components/DepthText';
 
-const SlideIn: React.FC<{ children: React.ReactNode; direction: 'left' | 'right' | 'up'; delay?: number }> = ({ children, direction, delay = 0 }) => {
+const SlideIn: React.FC<{ children: React.ReactNode; direction: 'left' | 'right' | 'up'; delay?: number; isReady?: boolean }> = ({ children, direction, delay = 0, isReady = true }) => {
   const [isVisible, setIsVisible] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (!isReady) return;
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
@@ -18,7 +22,7 @@ const SlideIn: React.FC<{ children: React.ReactNode; direction: 'left' | 'right'
     );
     if (ref.current) observer.observe(ref.current);
     return () => observer.disconnect();
-  }, []);
+  }, [isReady]);
 
   let transformClass = "";
   if (direction === 'left') transformClass = "-translate-x-24";
@@ -70,12 +74,11 @@ export const LandingPage: React.FC = () => {
       <LoadingScreen onComplete={() => setIntroComplete(true)} />
 
       <div
-        className={`min-h-screen ${themeBg} ${themeText} font-['Inter',sans-serif] antialiased transition-colors duration-500 overflow-x-hidden`}
+        className={`min-h-screen ${themeBg} ${themeText} font-['Inter',sans-serif] antialiased transition-colors duration-500`}
         style={{
           opacity: introComplete ? 1 : 0,
-          transform: introComplete ? 'translateY(0)' : 'translateY(32px)',
           transition: introComplete
-            ? 'opacity 0.9s cubic-bezier(0.16,1,0.3,1), transform 0.9s cubic-bezier(0.16,1,0.3,1)'
+            ? 'opacity 0.9s cubic-bezier(0.16,1,0.3,1)'
             : 'none',
         }}
       >
@@ -151,7 +154,7 @@ export const LandingPage: React.FC = () => {
 
             {/* Row 2 - Geometric Shape */}
             <div className="col-start-1 col-span-2 row-start-2 relative flex items-center justify-center">
-              <SlideIn direction="left" delay={200}>
+              <SlideIn direction="left" delay={200} isReady={introComplete}>
                 <div className="relative w-40 h-40 flex items-center justify-center">
                   <div className={`absolute inset-0 border-[8px] rounded-full transform -rotate-45 transition-colors ${
                     isDarkMode 
@@ -172,10 +175,53 @@ export const LandingPage: React.FC = () => {
                 isScrolled ? 'opacity-0' : 'opacity-100'
               }`}
             >
-              <SlideIn direction="left" delay={400}>
-                <h1 className={`text-6xl sm:text-7xl md:text-8xl lg:text-9xl font-semibold tracking-tight leading-none ${isDarkMode ? 'text-white' : 'text-black'}`}>
-                  Meet<br />Alliure
-                </h1>
+              <SlideIn direction="left" delay={400} isReady={introComplete}>
+                <div className="flex flex-col select-none w-full max-w-2xl">
+                  {introComplete && (
+                    <>
+                      <div className="w-full">
+                        <StrokeText
+                          text="Meet"
+                          fontSize={96}
+                          fontWeight={800}
+                          letterSpacing={-3}
+                          strokeColor={isDarkMode ? '#38BDF8' : '#0F172A'}
+                          fillColor={isDarkMode ? '#FFFFFF' : '#0F172A'}
+                          strokeWidth={1.8}
+                          drawDuration={1.3}
+                          fillDelay={0.15}
+                          stagger={0.05}
+                          ease="power2.out"
+                          trigger="mount"
+                          fillMode="wipe"
+                          wipeFrom="left"
+                          hoverRedraw={true}
+                          shadow={false}
+                        />
+                      </div>
+                      <div className="w-full -mt-2">
+                        <StrokeText
+                          text="Alliure"
+                          fontSize={96}
+                          fontWeight={800}
+                          letterSpacing={-3}
+                          strokeColor={isDarkMode ? '#38BDF8' : '#0F172A'}
+                          fillColor={isDarkMode ? '#FFFFFF' : '#0F172A'}
+                          strokeWidth={1.8}
+                          drawDuration={1.4}
+                          fillDelay={0.25}
+                          stagger={0.05}
+                          ease="power2.out"
+                          trigger="mount"
+                          fillMode="wipe"
+                          wipeFrom="left"
+                          hoverRedraw={true}
+                          shadow={false}
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
               </SlideIn>
             </div>
 
@@ -184,7 +230,7 @@ export const LandingPage: React.FC = () => {
                 isScrolled ? 'opacity-0' : 'opacity-100'
               }`}
             >
-              <SlideIn direction="right" delay={600}>
+              <SlideIn direction="right" delay={600} isReady={introComplete}>
                 <div>
                   <p className={`text-lg sm:text-xl lg:text-2xl leading-snug font-medium max-w-lg ${themeParagraph}`}>
                     Alliure redefines engineering workflows, cross-referencing self-reported task status against GitHub evidence to predict risk and unlock your <span className={`font-semibold ${isDarkMode ? 'text-sky-400' : 'text-black'}`}>true velocity</span>.
@@ -249,99 +295,195 @@ export const LandingPage: React.FC = () => {
           </div>
         </section>
 
-        {/* 03 — WHAT WE TRACK */}
-        <section className={`py-32 px-6 border-b border-dotted ${themeDotted} overflow-hidden`}>
+        {/* 03 & 04 — WHAT WE DO & HOW WE PREDICT DELAYS (SCROLL EXPAND EXPERIENCE) */}
+        <ScrollExpand
+          src="/team_collaboration.jpg"
+          mediaType="image"
+          alt="Engineering Team Collaboration"
+          title="WHAT WE DO"
+          scrollHint="Scroll to expand"
+          startWidth={48}
+          startHeight={60}
+          startRadius={24}
+          endRadius={0}
+          mediaZoom={1.15}
+          scrollDistance={1.8}
+          holdDistance={1.0}
+          smoothing={0.08}
+          overlayScrim={0.85}
+        />
+
+        {/* WHAT WE DO EXACTLY — CONCISE 3-BOX SUMMARY */}
+        <section className={`py-12 px-6 border-b border-dotted ${themeDotted} overflow-hidden`}>
           <div className="max-w-7xl mx-auto">
-            <SlideIn direction="left">
-              <h2 className={`text-xs font-semibold tracking-[0.2em] uppercase ${themeMuted} mb-16`}>03 — What We Track</h2>
+            <SlideIn direction="up">
+              <div className="text-center mb-8">
+                <span className={`text-[10px] font-bold tracking-[0.25em] uppercase ${themeMuted}`}>
+                  What We Do Exactly
+                </span>
+                <h3 className={`text-2xl md:text-3xl font-extrabold tracking-tight mt-1 ${isDarkMode ? 'text-white' : 'text-black'}`}>
+                  Automated truth for engineering teams.
+                </h3>
+              </div>
             </SlideIn>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {[
-                { title: 'Code Commits & PRs', desc: 'Real-time telemetry tracking commit frequency, additions/deletions, and pull request activity.' },
-                { title: 'Subtask Checklist Evidence', desc: 'Validates that estimated subcomponents are actually completed rather than just checked off at once.' },
-                { title: 'Hybrid Machine Learning', desc: 'Scikit-Learn Random Forest model blending historical delay trends with real-time risk indicators.' }
-              ].map((item, i) => (
-                <SlideIn key={item.title} direction="up" delay={i * 150}>
-                  <div className={`border border-dotted ${themeDotted} p-8 flex flex-col justify-between h-72 transition-colors duration-300 ${themeCardBg} rounded-xl`}>
-                    <div className="text-3xl font-light text-gray-400">0{i + 1}</div>
-                    <div>
-                      <h4 className={`text-xl font-semibold tracking-tight mb-2 ${isDarkMode ? 'text-white' : 'text-black'}`}>{item.title}</h4>
-                      <p className={`text-xs leading-relaxed ${themeParagraph}`}>{item.desc}</p>
-                    </div>
+
+            {/* 3 clean compact boxes with single-line takeaways */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <SlideIn direction="up" delay={100}>
+                <div className={`p-6 rounded-xl border border-dotted ${themeDotted} ${themeCardBg} transition-all h-full`}>
+                  <div className="text-sky-400 font-extrabold text-xs uppercase tracking-widest mb-1.5 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-sky-400" />
+                    1. Telemetry Capture
                   </div>
-                </SlideIn>
-              ))}
+                  <h4 className={`text-sm font-bold mb-1.5 ${isDarkMode ? 'text-white' : 'text-black'}`}>
+                    Direct GitHub &amp; Worklog Ingestion
+                  </h4>
+                  <p className={`text-xs ${themeParagraph}`}>
+                    Captures commits, PR activity, and logged hours automatically without asking engineers for manual status updates.
+                  </p>
+                </div>
+              </SlideIn>
+
+              <SlideIn direction="up" delay={150}>
+                <div className={`p-6 rounded-xl border border-dotted ${themeDotted} ${themeCardBg} transition-all h-full`}>
+                  <div className="text-emerald-400 font-extrabold text-xs uppercase tracking-widest mb-1.5 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                    2. Evidence Scoring
+                  </div>
+                  <h4 className={`text-sm font-bold mb-1.5 ${isDarkMode ? 'text-white' : 'text-black'}`}>
+                    Algorithmic 0–100% Progress Score
+                  </h4>
+                  <p className={`text-xs ${themeParagraph}`}>
+                    Synthesizes subtask deliverables, code additions/deletions, and dependencies into an indisputable evidence rating.
+                  </p>
+                </div>
+              </SlideIn>
+
+              <SlideIn direction="up" delay={200}>
+                <div className={`p-6 rounded-xl border border-dotted ${themeDotted} ${themeCardBg} transition-all h-full`}>
+                  <div className="text-purple-400 font-extrabold text-xs uppercase tracking-widest mb-1.5 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-purple-400" />
+                    3. AI Delay Prediction
+                  </div>
+                  <h4 className={`text-sm font-bold mb-1.5 ${isDarkMode ? 'text-white' : 'text-black'}`}>
+                    Random Forest Risk Forecasting
+                  </h4>
+                  <p className={`text-xs ${themeParagraph}`}>
+                    Flags stalled work and computes delay probability in real time so project managers can unblock teams before sprint slip.
+                  </p>
+                </div>
+              </SlideIn>
             </div>
           </div>
         </section>
 
-        {/* 04 — HOW IT WORKS */}
-        <section id="how-it-works" className="py-32 px-6 overflow-hidden">
-          <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-16">
-            <SlideIn direction="left">
-              <div>
-                <h2 className={`text-xs font-semibold tracking-[0.2em] uppercase ${themeMuted} mb-6`}>04 — How It Works</h2>
-                <h3 className={`text-4xl md:text-5xl font-semibold tracking-tight leading-tight ${isDarkMode ? 'text-white' : 'text-black'}`}>
-                  AI powered risk prediction engine.
-                </h3>
-              </div>
-            </SlideIn>
-            <SlideIn direction="right" delay={200}>
-              <div className="flex flex-col justify-end">
-                <p className={`text-lg leading-relaxed font-medium mb-8 ${themeParagraph}`}>
-                  Our machine learning model analyzes historical project data, deadline proximity, and real-time developer activity. When a task exhibits patterns associated with past delays, Alliure calculates a Delay Probability (%) and alerts managers immediately.
-                </p>
-                <div className={`h-[200px] w-full border border-dotted ${themeDotted} flex items-center justify-center relative overflow-hidden rounded-xl ${isDarkMode ? 'bg-[#131D33]' : 'bg-gray-50'}`}>
-                   <div className="absolute inset-0 grid grid-cols-[1fr_1fr] grid-rows-[1fr_1fr] opacity-40">
-                      <div className={`border-r border-b border-dotted ${themeDotted}`} />
-                      <div className={`border-b border-dotted ${themeDotted}`} />
-                      <div className={`border-r border-dotted ${themeDotted}`} />
-                   </div>
-                   <div className={`relative z-10 w-16 h-16 rounded-full flex items-center justify-center animate-pulse ${isDarkMode ? 'bg-white text-black' : 'bg-black text-white'}`}>
-                     <div className={`w-6 h-6 border rounded-full ${isDarkMode ? 'border-black' : 'border-white'}`} />
-                   </div>
-                </div>
-              </div>
-            </SlideIn>
-          </div>
-        </section>
-
-        {/* 05 — WHO IT'S FOR */}
+        {/* 04 — WHO IT'S FOR */}
         <section id="support" className={`py-32 px-6 border-t border-dotted ${themeDotted} overflow-hidden`}>
           <div className="max-w-7xl mx-auto">
             <SlideIn direction="up">
               <h2 className={`text-xs font-semibold tracking-[0.2em] uppercase ${themeMuted} mb-16 text-center`}>
-                05 — Enterprise Access & Governance
+                04 — Enterprise Access & Governance
               </h2>
             </SlideIn>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center items-start">
               <SlideIn direction="up" delay={100}>
-                <div className={`p-8 border border-dotted ${themeDotted} rounded-xl ${themeCardBg} transition-colors`}>
-                  <div className="text-xs font-bold tracking-widest uppercase text-sky-400 mb-2">Tier 01</div>
-                  <h4 className={`text-xl font-semibold tracking-tight mb-3 ${isDarkMode ? 'text-white' : 'text-black'}`}>System Admin</h4>
-                  <p className={`text-xs leading-relaxed ${themeParagraph}`}>
-                    Highest governance authority. Seeds workspaces, monitors full-system audit logs, and provisions accounts for Project Managers and Developers.
-                  </p>
+                <div className={`group relative p-6 sm:p-8 rounded-2xl transition-all duration-500 flex flex-col items-center justify-center min-h-[210px] cursor-pointer hover:-translate-y-1.5 ${
+                  isDarkMode
+                    ? 'bg-[#10192D]/90 border border-slate-800 hover:border-sky-400 hover:shadow-[0_0_30px_rgba(56,189,248,0.3)]'
+                    : 'bg-white border border-slate-200 hover:border-sky-500 hover:shadow-[0_0_25px_rgba(14,165,233,0.25)]'
+                }`}>
+                  <div className={`text-xs font-bold tracking-widest uppercase mb-4 transition-colors duration-300 ${
+                    isDarkMode ? 'text-slate-400 group-hover:text-sky-400' : 'text-slate-500 group-hover:text-sky-600'
+                  }`}>
+                    Tier 01
+                  </div>
+                  <div className="mb-2 flex items-center justify-center min-h-[70px] w-full">
+                    <DepthText
+                      text="Admin Dashboard"
+                      fontSize="clamp(1.5rem, 2vw, 1.85rem)"
+                      fontWeight={800}
+                      layers={14}
+                      depth={1.4}
+                      faceColor={isDarkMode ? '#F8FAFC' : '#0F172A'}
+                      depthColor={isDarkMode ? '#334155' : '#CBD5E1'}
+                      tilt={5}
+                      hoverPush={0.3}
+                      autoOrbit={false}
+                      shadow={true}
+                    />
+                  </div>
+                  <div className="max-h-0 opacity-0 -translate-y-2 group-hover:max-h-40 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-500 ease-out overflow-hidden w-full">
+                    <p className={`text-xs leading-relaxed pt-4 ${themeParagraph}`}>
+                      Highest governance authority. Seeds workspaces, monitors full-system audit logs, and provisions accounts for Project Managers and Developers.
+                    </p>
+                  </div>
                 </div>
               </SlideIn>
               <SlideIn direction="up" delay={250}>
-                <div className={`p-8 border border-dotted ${themeDotted} rounded-xl ${themeCardBg} transition-colors`}>
-                  <div className="text-xs font-bold tracking-widest uppercase text-emerald-400 mb-2">Tier 02</div>
-                  <h4 className={`text-xl font-semibold tracking-tight mb-3 ${isDarkMode ? 'text-white' : 'text-black'}`}>Project Manager</h4>
-                  <p className={`text-xs leading-relaxed ${themeParagraph}`}>
-                    Created by Admin. Manages sprint delivery, unblocks tasks, and invites/provisions Developer accounts for their projects.
-                  </p>
+                <div className={`group relative p-6 sm:p-8 rounded-2xl transition-all duration-500 flex flex-col items-center justify-center min-h-[210px] cursor-pointer hover:-translate-y-1.5 ${
+                  isDarkMode
+                    ? 'bg-[#10192D]/90 border border-slate-800 hover:border-sky-400 hover:shadow-[0_0_30px_rgba(56,189,248,0.3)]'
+                    : 'bg-white border border-slate-200 hover:border-sky-500 hover:shadow-[0_0_25px_rgba(14,165,233,0.25)]'
+                }`}>
+                  <div className={`text-xs font-bold tracking-widest uppercase mb-4 transition-colors duration-300 ${
+                    isDarkMode ? 'text-slate-400 group-hover:text-sky-400' : 'text-slate-500 group-hover:text-sky-600'
+                  }`}>
+                    Tier 02
+                  </div>
+                  <div className="mb-2 flex items-center justify-center min-h-[70px] w-full">
+                    <DepthText
+                      text="Project Manager Dashboard"
+                      fontSize="clamp(1.3rem, 1.6vw, 1.55rem)"
+                      fontWeight={800}
+                      layers={14}
+                      depth={1.4}
+                      faceColor={isDarkMode ? '#F8FAFC' : '#0F172A'}
+                      depthColor={isDarkMode ? '#334155' : '#CBD5E1'}
+                      tilt={5}
+                      hoverPush={0.3}
+                      autoOrbit={false}
+                      shadow={true}
+                    />
+                  </div>
+                  <div className="max-h-0 opacity-0 -translate-y-2 group-hover:max-h-40 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-500 ease-out overflow-hidden w-full">
+                    <p className={`text-xs leading-relaxed pt-4 ${themeParagraph}`}>
+                      Created by Admin. Manages sprint delivery, unblocks tasks, and invites/provisions Developer accounts for their projects.
+                    </p>
+                  </div>
                 </div>
               </SlideIn>
               <SlideIn direction="up" delay={400}>
-                <div className={`p-8 border border-dotted ${themeDotted} rounded-xl ${themeCardBg} transition-colors`}>
-                  <div className="text-xs font-bold tracking-widest uppercase text-indigo-400 mb-2">Tier 03</div>
-                  <h4 className={`text-xl font-semibold tracking-tight mb-3 ${isDarkMode ? 'text-white' : 'text-black'}`}>Developer</h4>
-                  <p className={`text-xs leading-relaxed ${themeParagraph}`}>
-                    Invited by Admin or PM. Focuses on writing code, checking subtasks, and logging work while automated telemetry keeps status up-to-date.
-                  </p>
+                <div className={`group relative p-6 sm:p-8 rounded-2xl transition-all duration-500 flex flex-col items-center justify-center min-h-[210px] cursor-pointer hover:-translate-y-1.5 ${
+                  isDarkMode
+                    ? 'bg-[#10192D]/90 border border-slate-800 hover:border-sky-400 hover:shadow-[0_0_30px_rgba(56,189,248,0.3)]'
+                    : 'bg-white border border-slate-200 hover:border-sky-500 hover:shadow-[0_0_25px_rgba(14,165,233,0.25)]'
+                }`}>
+                  <div className={`text-xs font-bold tracking-widest uppercase mb-4 transition-colors duration-300 ${
+                    isDarkMode ? 'text-slate-400 group-hover:text-sky-400' : 'text-slate-500 group-hover:text-sky-600'
+                  }`}>
+                    Tier 03
+                  </div>
+                  <div className="mb-2 flex items-center justify-center min-h-[70px] w-full">
+                    <DepthText
+                      text="Developer Dashboard"
+                      fontSize="clamp(1.45rem, 1.8vw, 1.7rem)"
+                      fontWeight={800}
+                      layers={14}
+                      depth={1.4}
+                      faceColor={isDarkMode ? '#F8FAFC' : '#0F172A'}
+                      depthColor={isDarkMode ? '#334155' : '#CBD5E1'}
+                      tilt={5}
+                      hoverPush={0.3}
+                      autoOrbit={false}
+                      shadow={true}
+                    />
+                  </div>
+                  <div className="max-h-0 opacity-0 -translate-y-2 group-hover:max-h-40 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-500 ease-out overflow-hidden w-full">
+                    <p className={`text-xs leading-relaxed pt-4 ${themeParagraph}`}>
+                      Invited by Admin or PM. Focuses on writing code, checking subtasks, and logging work while automated telemetry keeps status up-to-date.
+                    </p>
+                  </div>
                 </div>
               </SlideIn>
             </div>

@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { getTimeBasedGreeting } from '../utils/greetings';
 import { RiskBadge } from '../components/RiskBadge';
 import { EvidenceMeter } from '../components/EvidenceMeter';
 import {
@@ -220,11 +221,39 @@ export const AdminDashboard: React.FC = () => {
           <h1 className={`text-3xl font-extrabold tracking-tight ${
             isDark ? 'text-white' : 'text-slate-900'
           }`}>
-            System Administration &amp; Access Control
+            {getTimeBasedGreeting()}, {user?.fullName || 'Administrator'} 👋
           </h1>
-          <p className={`text-xs mt-1 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-            Central governance: manage software projects, provision engineers, allocate developers, and audit predictive risk telemetry.
+          <p className={`text-xs mt-1.5 font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+            Welcome back! Here's what's happening across your teams, projects, and delivery milestones today.
           </p>
+
+          {/* Interactive quick insight badges */}
+          <div className="flex flex-wrap items-center gap-2 mt-3 text-xs">
+            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold border ${
+              isDark 
+                ? 'bg-emerald-950/50 border-emerald-800/60 text-emerald-300' 
+                : 'bg-emerald-50 border-emerald-200 text-emerald-800'
+            }`}>
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>Telemetry Live</span>
+            </span>
+
+            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium border ${
+              isDark 
+                ? 'bg-slate-900/60 border-slate-800 text-slate-300' 
+                : 'bg-slate-100 border-slate-200 text-slate-700'
+            }`}>
+              <span><strong>{projectsList.length}</strong> Active Projects</span>
+            </span>
+
+            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium border ${
+              isDark 
+                ? 'bg-slate-900/60 border-slate-800 text-slate-300' 
+                : 'bg-slate-100 border-slate-200 text-slate-700'
+            }`}>
+              <span><strong>{usersList.length}</strong> Team Members</span>
+            </span>
+          </div>
         </div>
 
         <div className="flex items-center gap-3">
